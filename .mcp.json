@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "terraform": {
+      "type": "stdio",
+      "command": "C:\\Users\\hb\\go\\bin\\terraform-mcp-server.exe",
+      "args": ["stdio"],
+      "env": {
+        "LOG_LEVEL": "warn"
+      }
+    }
+  }
+}

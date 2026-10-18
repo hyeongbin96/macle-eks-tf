@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body><title>macle 테라폼 실행 흐름</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: 한 줄 세로 흐름. 실행 순서대로 섹션을 쌓고, 각 섹션은 설명 한 단락 + 도식 하나 */
+:root {
+  --bg: #f2f5f6;
+  --surface: #ffffff;
+  --fg: #142029;
+  --muted: #566773;
+  --line: #cbd5dc;
+  --line-strong: #7a8b97;
+  --accent: #0a7570;
+  --accent-soft: #d6eeec;
+  --warm: #b0531c;
+  --warm-soft: #f7e5d8;
+  --sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1418; --surface: #162028; --fg: #e3e9ed; --muted: #93a3ae;
+    --line: #2b3842; --line-strong: #62747f; --accent: #3cc1b6; --accent-soft: #11332f;
+    --warm: #e88d55; --warm-soft: #3a2517; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1418; --surface: #162028; --fg: #e3e9ed; --muted: #93a3ae;
+  --line: #2b3842; --line-strong: #62747f; --accent: #3cc1b6; --accent-soft: #11332f;
+  --warm: #e88d55; --warm-soft: #3a2517; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--sans); font-size: 15px; line-height: 1.65;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 72px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+code, .mono { font-family: var(--mono); font-size: 0.88em; }
+code { background: var(--accent-soft); color: var(--fg); padding: 1px 5px; border-radius: 4px; }
+
+header { display: flex; flex-direction: column; gap: 12px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-size: clamp(28px, 4.2vw, 40px); line-height: 1.2; margin: 0; font-weight: 700; text-wrap: balance; }
+h2 { font-size: 22px; margin: 0; font-weight: 700; text-wrap: balance; display: flex; align-items: baseline; gap: 12px; }
+h2 .step { font-family: var(--mono); font-size: 13px; color: var(--accent); font-weight: 600; }
+.lede { max-width: 68ch; color: var(--muted); margin: 0; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button {
+  font: 500 13px var(--sans); color: var(--fg); background: var(--surface);
+  border: 1px solid var(--line-strong); border-radius: 6px; padding: 7px 14px; cursor: pointer;
+}
+button:hover { border-color: var(--accent); color: var(--accent); }
+button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 14px; height: 14px; border-radius: 3px; border: 1.5px solid; display: inline-block; }
+.sw.file { background: var(--surface); border-color: var(--line-strong); }
+.sw.mod { background: var(--accent-soft); border-color: var(--accent); }
+.sw.aws { background: var(--warm-soft); border-color: var(--warm); }
+
+section { display: flex; flex-direction: column; gap: 16px; }
+section > p { max-width: 70ch; margin: 0; color: var(--muted); }
+figure { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.canvas {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  overflow-x: auto; padding: 12px;
+}
+.canvas svg { display: block; width: 100%; min-width: 760px; height: auto; }
+figcaption { font-size: 13px; color: var(--muted); max-width: 80ch; }
+
+/* SVG 요소 */
+.n-file { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1.4; }
+.n-mod { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.4; }
+.n-aws { fill: var(--warm-soft); stroke: var(--warm); stroke-width: 1.4; }
+.n-row { fill: var(--surface); stroke: var(--accent); stroke-width: 1; }
+.t-title { font: 600 13px var(--mono); fill: var(--fg); }
+.t-big { font: 600 14px var(--mono); fill: var(--fg); }
+.t-sub { font: 400 11px var(--sans); fill: var(--muted); }
+.t-lane { font: 700 13px var(--sans); fill: var(--fg); }
+.t-col { font: 600 11px var(--mono); fill: var(--muted); letter-spacing: 0.06em; }
+.t-edge { font: 500 11px var(--sans); fill: var(--fg); }
+.t-edge.acc { fill: var(--accent); }
+.t-edge.warm { fill: var(--warm); }
+.t-code { font: 400 11px var(--mono); fill: var(--fg); }
+.mk-base { fill: var(--line-strong); }
+.mk-acc { fill: var(--accent); }
+.mk-warm { fill: var(--warm); }
+
+.edge { fill: none; stroke: var(--line-strong); stroke-width: 1.6; marker-end: url(#ah); }
+.edge.acc { stroke: var(--accent); marker-end: url(#ah-acc); }
+.edge.warm { stroke: var(--warm); marker-end: url(#ah-warm); }
+.edge.flow { stroke-dasharray: 6 5; animation: march 0.9s linear infinite; }
+@keyframes march { to { stroke-dashoffset: -11; } }
+.dot { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; }
+.dot.warm { fill: var(--warm); }
+.paused .edge.flow { animation-play-state: paused; }
+
+/* 파일 참조 맵 상호작용 */
+.node { cursor: pointer; transition: opacity 0.2s; }
+.node:hover rect:first-of-type { stroke-width: 2.4; }
+.map.focus .node, .map.focus .edge, .map.focus .elabel { opacity: 0.18; }
+.map.focus .node.hot, .map.focus .edge.hot, .map.focus .elabel.hot { opacity: 1; }
+.map.focus .edge.hot { stroke: var(--accent); stroke-width: 2.4; marker-end: url(#ah-acc); }
+
+.detail {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 16px 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 24px;
+}
+.detail h3 { grid-column: 1 / -1; margin: 0; font: 600 15px var(--mono); color: var(--accent); }
+.detail dl { margin: 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.detail dt { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.detail dd { margin: 0; font-size: 14px; }
+
+/* apply 단계 */
+.stages-scroll { overflow-x: auto; padding-bottom: 6px; }
+.stages { display: flex; align-items: stretch; gap: 0; min-width: max-content; }
+.stage {
+  width: 214px; flex: none; background: var(--surface); border: 1.5px solid var(--line);
+  border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;
+  transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+}
+.stage.active { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); transform: translateY(-3px); }
+.stage .hd { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.stage .no { font: 600 12px var(--mono); color: var(--accent); }
+.stage .time { font: 400 11px var(--mono); color: var(--warm); }
+.stage h4 { margin: 0; font-size: 15px; line-height: 1.35; }
+.stage ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.stage li { font-size: 12.5px; line-height: 1.5; padding-left: 10px; border-left: 2px solid var(--line); }
+.stage li b { font-family: var(--mono); font-weight: 600; font-size: 11.5px; display: block; color: var(--fg); }
+.stage .wait { font-size: 11.5px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 8px; margin-top: auto; }
+.link { width: 44px; flex: none; align-self: center; }
+.link svg { width: 44px; height: 20px; display: block; }
+.link .edge { stroke-width: 2; }
+.link.active .edge { stroke: var(--accent); marker-end: url(#ah-acc); }
+
+.note {
+  border-left: 3px solid var(--warm); background: var(--warm-soft); padding: 12px 16px;
+  border-radius: 0 8px 8px 0; font-size: 14px; max-width: 80ch;
+}
+
+/* 표 */
+.tbl-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 13.5px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+td:first-child { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+tr.grp td { background: var(--accent-soft); font-weight: 700; font-family: var(--mono); color: var(--accent); }
+tbody tr:last-child td { border-bottom: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .edge.flow { animation: none; }
+  .stage, .node { transition: none; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="mk-base" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="mk-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="ah-warm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="mk-warm" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">C:\terraform · macle · DEV · ap-northeast-2</div>
+  <h1>macle 테라폼 실행 흐름</h1>
+  <p class="lede">작성한 Terraform 코드가 <code>terraform init</code>부터 <code>apply</code>까지 어떤 순서로 실행되는지 정리한 페이지입니다. 어떤 파일이 어떤 파일을 읽는지, 모듈 사이로 어떤 값이 넘어가는지도 함께 보여줍니다. 움직이는 점은 실제 실행·데이터 흐름의 순서를 나타냅니다.</p>
+  <div class="controls">
+    <button type="button" id="toggleMotion" aria-pressed="false">애니메이션 일시정지</button>
+    <div class="legend">
+      <span><i class="sw file"></i>설정 파일</span>
+      <span><i class="sw mod"></i>모듈</span>
+      <span><i class="sw aws"></i>CLI · state · AWS</span>
+    </div>
+  </div>
+</header>
+
+<!-- 1. 전체 실행 단계 -->
+<section>
+  <h2><span class="step">1</span>전체 실행 단계</h2>
+  <p>실행은 두 번으로 나뉩니다. 먼저 <code>bootstrap/</code>에서 state를 보관할 S3 버킷을 한 번 만듭니다. 그다음부터는 <code>envs/dev/</code>에서만 작업하고, state와 잠금은 그 버킷에서 관리합니다.</p>
+  <figure>
+    <div class="canvas">
+      <svg class="anim" data-cycle="9" viewBox="0 0 1000 340" role="img" aria-label="bootstrap에서 S3 버킷을 만든 뒤, envs/dev에서 init, plan, apply가 S3 state를 연결, 잠금, 저장하며 AWS 리소스를 만든다">
+        <text class="t-lane" x="20" y="64">① bootstrap/</text>
+        <text class="t-sub" x="20" y="82">최초 1회</text>
+        <text class="t-lane" x="20" y="184">② envs/dev/</text>
+        <text class="t-sub" x="20" y="202">변경할 때마다</text>
+        <text class="t-lane" x="20" y="299">state 저장소</text>
+
+        <!-- Row A -->
+        <rect class="n-aws" x="150" y="30" width="160" height="60" rx="8"/>
+        <text class="t-title" x="230" y="55" text-anchor="middle">terraform init</text>
+        <text class="t-sub" x="230" y="74" text-anchor="middle">provider 설치 · 로컬 state</text>
+        <rect class="n-aws" x="350" y="30" width="160" height="60" rx="8"/>
+        <text class="t-title" x="430" y="55" text-anchor="middle">terraform plan</text>
+        <text class="t-sub" x="430" y="74" text-anchor="middle">만들 리소스 계산</text>
+        <rect class="n-aws" x="550" y="30" width="160" height="60" rx="8"/>
+        <text class="t-title" x="630" y="55" text-anchor="middle">terraform apply</text>
+        <text class="t-sub" x="630" y="74" text-anchor="middle">버킷 생성 · 로컬에 state</text>
+        <rect class="n-aws" x="790" y="30" width="190" height="60" rx="8"/>
+        <text class="t-title" x="885" y="55" text-anchor="middle">S3 버킷</text>
+        <text class="t-sub" x="885" y="74" text-anchor="middle">macle-tfstate-&lt;계정ID&gt;</text>
+
+        <path class="edge flow" data-t="0.02,0.08" d="M310,60 H350"/>
+        <path class="edge flow" data-t="0.09,0.15" d="M510,60 H550"/>
+        <path class="edge flow warm" data-t="0.16,0.24" data-c="warm" d="M710,60 H790"/>
+        <text class="t-edge warm" x="750" y="52" text-anchor="middle">생성</text>
+
+        <path class="edge flow acc" data-t="0.25,0.37" d="M630,90 V120 H230 V150"/>
+        <text class="t-edge acc" x="430" y="113" text-anchor="middle">output state_bucket_name → envs/dev/backend.tf에 기입</text>
+
+        <!-- Row B -->
+        <rect class="n-aws" x="150" y="150" width="160" height="60" rx="8"/>
+        <text class="t-title" x="230" y="175" text-anchor="middle">terraform init</text>
+        <text class="t-sub" x="230" y="194" text-anchor="middle">provider · 모듈 · backend</text>
+        <rect class="n-aws" x="350" y="150" width="160" height="60" rx="8"/>
+        <text class="t-title" x="430" y="175" text-anchor="middle">terraform plan</text>
+        <text class="t-sub" x="430" y="194" text-anchor="middle">state와 코드 비교</text>
+        <rect class="n-aws" x="550" y="150" width="160" height="60" rx="8"/>
+        <text class="t-title" x="630" y="175" text-anchor="middle">terraform apply</text>
+        <text class="t-sub" x="630" y="194" text-anchor="middle">리소스 생성 · 변경</text>
+        <rect class="n-aws" x="790" y="150" width="190" height="60" rx="8"/>
+        <text class="t-title" x="885" y="175" text-anchor="middle">AWS API</text>
+        <text class="t-sub" x="885" y="194" text-anchor="middle">VPC · EKS · 노드 · 애드온</text>
+
+        <path class="edge flow warm" data-t="0.39,0.45" data-c="warm" d="M230,210 V270"/>
+        <text class="t-edge" x="238" y="246">backend 연결</text>
+        <path class="edge flow" data-t="0.46,0.52" d="M310,180 H350"/>
+        <path class="edge flow warm" data-t="0.53,0.59" data-c="warm" d="M430,210 V270"/>
+        <text class="t-edge" x="438" y="246">lock 획득 · state 읽기</text>
+        <path class="edge flow" data-t="0.60,0.66" d="M510,180 H550"/>
+        <path class="edge flow acc" data-t="0.67,0.78" d="M710,180 H790"/>
+        <text class="t-edge acc" x="750" y="172" text-anchor="middle">API 호출</text>
+        <path class="edge flow warm" data-t="0.80,0.88" data-c="warm" d="M630,210 V270"/>
+        <text class="t-edge" x="638" y="246">state 저장 · unlock</text>
+
+        <!-- S3 state -->
+        <rect class="n-aws" x="150" y="270" width="560" height="54" rx="8"/>
+        <text class="t-title" x="430" y="293" text-anchor="middle">s3://macle-tfstate-&lt;계정ID&gt;/envs/dev/terraform.tfstate</text>
+        <text class="t-sub" x="430" y="312" text-anchor="middle">use_lockfile = true → 실행 중에는 .tflock 파일로 동시 실행을 막음</text>
+      </svg>
+    </div>
+    <figcaption>bootstrap의 state는 로컬(<code>bootstrap/terraform.tfstate</code>)에 남습니다. 버킷을 만드는 코드가 그 버킷을 backend로 쓸 수는 없기 때문입니다. envs/dev에서는 plan과 apply가 시작될 때 lock을 잡고, 끝날 때 state를 쓰고 lock을 풉니다.</figcaption>
+  </figure>
+</section>
+
+<!-- 2. 파일 참조 맵 -->
+<section>
+  <h2><span class="step">2</span>envs/dev 파일 참조 맵</h2>
+  <p>Terraform은 디렉터리 안의 <code>.tf</code> 파일을 이름이나 순서와 상관없이 하나로 합쳐 읽습니다. 파일을 나눈 건 사람이 읽기 위해서이고, 실제 연결은 <code>var.</code>, <code>local.</code>, <code>module.</code> 참조로 정해집니다. <strong>파일을 클릭하면</strong> 그 파일이 읽는 것과 그 파일을 읽는 것만 강조됩니다.</p>
+  <figure>
+    <div class="canvas">
+      <svg class="anim map" id="fileMap" data-cycle="10" viewBox="0 0 1050 580" role="img" aria-label="terraform.tfvars가 variables.tf에 값을 넣고, variables와 locals가 providers와 main.tf로 전달되며, main.tf가 네 모듈을 호출하고 출력값을 받아 outputs.tf로 내보낸다">
+        <text class="t-col" x="105" y="22" text-anchor="middle">값</text>
+        <text class="t-col" x="335" y="22" text-anchor="middle">선언 · 계산</text>
+        <text class="t-col" x="610" y="22" text-anchor="middle">조립</text>
+        <text class="t-col" x="910" y="22" text-anchor="middle">modules/</text>
+        <text class="t-sub" x="790" y="176">→ source로 호출 · 입력 전달</text>
+        <text class="t-sub" x="790" y="192" style="fill:var(--accent)">⇠ module.x.출력값 반환</text>
+
+        <!-- edges -->
+        <path class="edge flow" data-a="tfvars" data-b="variables" data-t="0.02,0.09" d="M190,105 H250"/>
+        <text class="t-edge elabel" data-a="tfvars" data-b="variables" x="220" y="97" text-anchor="middle">자동 로드</text>
+
+        <path class="edge flow" data-a="variables" data-b="locals" data-t="0.11,0.19" d="M335,130 V220"/>
+        <text class="t-edge elabel" data-a="variables" data-b="locals" x="343" y="178">var.project · environment</text>
+
+        <path class="edge flow" data-a="variables" data-b="providers" data-t="0.11,0.19" d="M420,92 H470 V65 H520"/>
+        <text class="t-edge elabel" data-a="variables" data-b="providers" x="425" y="86">var.region 등</text>
+
+        <path class="edge flow" data-a="variables" data-b="main" data-t="0.11,0.21" d="M420,115 H480 V178 H520"/>
+        <text class="t-edge elabel" data-a="variables" data-b="main" x="486" y="150">var.*</text>
+
+        <path class="edge flow" data-a="locals" data-b="main" data-t="0.22,0.29" d="M420,245 H520"/>
+        <text class="t-edge elabel" data-a="locals" data-b="main" x="470" y="238" text-anchor="middle">local.*</text>
+
+        <path class="edge flow" data-a="main" data-b="m-vpc" data-t="0.31,0.36" d="M700,218 H790"/>
+        <path class="edge flow acc" data-a="main" data-b="m-vpc" data-t="0.37,0.42" d="M790,230 H700"/>
+        <path class="edge flow" data-a="main" data-b="m-cluster" data-t="0.43,0.48" d="M700,278 H790"/>
+        <path class="edge flow acc" data-a="main" data-b="m-cluster" data-t="0.49,0.54" d="M790,290 H700"/>
+        <path class="edge flow" data-a="main" data-b="m-node" data-t="0.55,0.60" d="M700,338 H790"/>
+        <path class="edge flow acc" data-a="main" data-b="m-node" data-t="0.61,0.66" d="M790,350 H700"/>
+        <path class="edge flow" data-a="main" data-b="m-addons" data-t="0.67,0.72" d="M700,398 H790"/>
+        <path class="edge flow acc" data-a="main" data-b="m-addons" data-t="0.73,0.78" d="M790,410 H700"/>
+
+        <path class="edge flow" data-a="main" data-b="outputs" data-t="0.80,0.88" d="M610,460 V510"/>
+        <text class="t-edge elabel" data-a="main" data-b="outputs" x="618" y="490">module.*.출력값</text>
+
+        <path class="edge flow warm" data-a="versions" data-b="init" data-t="0.02,0.08" data-c="warm" d="M190,432 H220 V455 H250"/>
+        <path class="edge flow warm" data-a="backend" data-b="init" data-t="0.02,0.08" data-c="warm" d="M190,492 H220 V469 H250"/>
+
+        <!-- nodes -->
+        <g class="node" data-node="tfvars" tabindex="0" role="button" aria-label="terraform.tfvars">
+          <rect class="n-file" x="20" y="80" width="170" height="50" rx="7"/>
+          <text class="t-title" x="105" y="101" text-anchor="middle">terraform.tfvars</text>
+          <text class="t-sub" x="105" y="119" text-anchor="middle">실제 값</text>
+        </g>
+        <g class="node" data-node="variables" tabindex="0" role="button" aria-label="variables.tf">
+          <rect class="n-file" x="250" y="80" width="170" height="50" rx="7"/>
+          <text class="t-title" x="335" y="101" text-anchor="middle">variables.tf</text>
+          <text class="t-sub" x="335" y="119" text-anchor="middle">입력 타입 · 검증 선언</text>
+        </g>
+        <g class="node" data-node="locals" tabindex="0" role="button" aria-label="locals.tf">
+          <rect class="n-file" x="250" y="220" width="170" height="50" rx="7"/>
+          <text class="t-title" x="335" y="241" text-anchor="middle">locals.tf</text>
+          <text class="t-sub" x="335" y="259" text-anchor="middle">macle-dev · macle-dev-eks</text>
+        </g>
+        <g class="node" data-node="providers" tabindex="0" role="button" aria-label="providers.tf">
+          <rect class="n-file" x="520" y="40" width="180" height="50" rx="7"/>
+          <text class="t-title" x="610" y="61" text-anchor="middle">providers.tf</text>
+          <text class="t-sub" x="610" y="79" text-anchor="middle">리전 · default_tags</text>
+        </g>
+        <g class="node" data-node="main" tabindex="0" role="button" aria-label="main.tf">
+          <rect class="n-file" x="520" y="150" width="180" height="310" rx="7"/>
+          <text class="t-big" x="610" y="174" text-anchor="middle">main.tf</text>
+          <text class="t-sub" x="610" y="192" text-anchor="middle">모듈 4개 호출 · 서로 연결</text>
+          <rect class="n-row" x="532" y="206" width="156" height="36" rx="5"/>
+          <text class="t-code" x="610" y="228" text-anchor="middle">module "vpc"</text>
+          <rect class="n-row" x="532" y="266" width="156" height="36" rx="5"/>
+          <text class="t-code" x="610" y="288" text-anchor="middle">module "eks_cluster"</text>
+          <rect class="n-row" x="532" y="326" width="156" height="36" rx="5"/>
+          <text class="t-code" x="610" y="348" text-anchor="middle">module "eks_node_group"</text>
+          <rect class="n-row" x="532" y="386" width="156" height="36" rx="5"/>
+          <text class="t-code" x="610" y="408" text-anchor="middle">module "eks_addons"</text>
+          <text class="t-sub" x="610" y="444" text-anchor="middle">depends_on = [eks_node_group]</text>
+        </g>
+        <g class="node" data-node="outputs" tabindex="0" role="button" aria-label="outputs.tf">
+          <rect class="n-file" x="520" y="510" width="180" height="50" rx="7"/>
+          <text class="t-title" x="610" y="531" text-anchor="middle">outputs.tf</text>
+          <text class="t-sub" x="610" y="549" text-anchor="middle">endpoint · kubectl 명령</text>
+        </g>
+
+        <g class="node" data-node="m-vpc" tabindex="0" role="button" aria-label="modules/vpc">
+          <rect class="n-mod" x="790" y="200" width="240" height="48" rx="7"/>
+          <text class="t-title" x="910" y="220" text-anchor="middle">modules/vpc</text>
+          <text class="t-sub" x="910" y="238" text-anchor="middle">variables.tf → main.tf → outputs.tf</text>
+        </g>
+        <g class="node" data-node="m-cluster" tabindex="0" role="button" aria-label="modules/eks-cluster">
+          <rect class="n-mod" x="790" y="260" width="240" height="48" rx="7"/>
+          <text class="t-title" x="910" y="280" text-anchor="middle">modules/eks-cluster</text>
+          <text class="t-sub" x="910" y="298" text-anchor="middle">variables.tf → main.tf → outputs.tf</text>
+        </g>
+        <g class="node" data-node="m-node" tabindex="0" role="button" aria-label="modules/eks-node-group">
+          <rect class="n-mod" x="790" y="320" width="240" height="48" rx="7"/>
+          <text class="t-title" x="910" y="340" text-anchor="middle">modules/eks-node-group</text>
+          <text class="t-sub" x="910" y="358" text-anchor="middle">variables.tf → main.tf → outputs.tf</text>
+        </g>
+        <g class="node" data-node="m-addons" tabindex="0" role="button" aria-label="modules/eks-addons">
+          <rect class="n-mod" x="790" y="380" width="240" height="48" rx="7"/>
+          <text class="t-title" x="910" y="400" text-anchor="middle">modules/eks-addons</text>
+          <text class="t-sub" x="910" y="418" text-anchor="middle">variables.tf → main.tf → outputs.tf</text>
+        </g>
+
+        <text class="t-sub" x="20" y="398">init 때 CLI가 직접 읽음 (변수 참조 불가)</text>
+        <g class="node" data-node="versions" tabindex="0" role="button" aria-label="versions.tf">
+          <rect class="n-file" x="20" y="410" width="170" height="44" rx="7"/>
+          <text class="t-title" x="105" y="429" text-anchor="middle">versions.tf</text>
+          <text class="t-sub" x="105" y="445" text-anchor="middle">버전 고정</text>
+        </g>
+        <g class="node" data-node="backend" tabindex="0" role="button" aria-label="backend.tf">
+          <rect class="n-file" x="20" y="470" width="170" height="44" rx="7"/>
+          <text class="t-title" x="105" y="489" text-anchor="middle">backend.tf</text>
+          <text class="t-sub" x="105" y="505" text-anchor="middle">state 위치</text>
+        </g>
+        <g class="node" data-node="init" tabindex="0" role="button" aria-label="terraform init">
+          <rect class="n-aws" x="250" y="440" width="170" height="44" rx="7"/>
+          <text class="t-title" x="335" y="459" text-anchor="middle">terraform init</text>
+          <text class="t-sub" x="335" y="475" text-anchor="middle">.terraform/ · lock.hcl 생성</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>모듈 안에는 <code>provider</code> 블록이 없습니다. 모든 모듈이 <code>providers.tf</code>의 aws provider를 물려받기 때문에, 모듈이 만드는 리소스에도 <code>default_tags</code>(Project, Environment, ManagedBy)가 자동으로 붙습니다.</figcaption>
+  </figure>
+  <div class="detail" id="detail" aria-live="polite"></div>
+</section>
+
+<!-- 3. 모듈 간 데이터 흐름 -->
+<section>
+  <h2><span class="step">3</span>모듈 사이로 넘어가는 값</h2>
+  <p><code>main.tf</code>에서 한 모듈의 출력값을 다음 모듈의 입력으로 넘깁니다. Terraform은 이 참조를 보고 생성 순서를 정합니다. 코드를 적은 순서는 영향을 주지 않습니다. 애드온만 참조가 아닌 <code>depends_on</code>으로 순서를 강제합니다.</p>
+  <figure>
+    <div class="canvas">
+      <svg class="anim" data-cycle="8" viewBox="0 0 1000 570" role="img" aria-label="vpc의 private_subnet_ids가 eks_cluster와 eks_node_group으로, eks_cluster의 cluster_name과 cluster_version이 eks_node_group으로, cluster_name이 eks_addons로 전달되고, eks_addons는 depends_on으로 노드 그룹 뒤에 실행된다">
+        <!-- boxes -->
+        <rect class="n-mod" x="260" y="30" width="420" height="90" rx="8"/>
+        <text class="t-big" x="280" y="56">module.vpc</text>
+        <text class="t-code" x="660" y="56" text-anchor="end" style="fill:var(--muted)">modules/vpc</text>
+        <text class="t-sub" x="280" y="82">입력 ← tfvars: vpc_cidr · azs · public/private_subnet_cidrs · single_nat_gateway</text>
+        <text class="t-sub" x="280" y="102">만드는 것: VPC · 서브넷 4 · IGW · EIP/NAT 1 · 라우트 테이블 3</text>
+
+        <rect class="n-mod" x="260" y="170" width="420" height="90" rx="8"/>
+        <text class="t-big" x="280" y="196">module.eks_cluster</text>
+        <text class="t-code" x="660" y="196" text-anchor="end" style="fill:var(--muted)">modules/eks-cluster</text>
+        <text class="t-sub" x="280" y="222">입력 ← tfvars: kubernetes_version · public_access_cidrs · admin_principal_arns</text>
+        <text class="t-sub" x="280" y="242">만드는 것: IAM 역할 · KMS 키 · 로그 그룹 · EKS 클러스터 · OIDC · Access Entry</text>
+
+        <rect class="n-mod" x="260" y="310" width="420" height="90" rx="8"/>
+        <text class="t-big" x="280" y="336">module.eks_node_group</text>
+        <text class="t-code" x="660" y="336" text-anchor="end" style="fill:var(--muted)">modules/eks-node-group</text>
+        <text class="t-sub" x="280" y="362">입력 ← tfvars: node_groups (default: t3.medium, 2대, 1~3)</text>
+        <text class="t-sub" x="280" y="382">만드는 것: 노드 IAM 역할 · Launch Template · 관리형 노드 그룹</text>
+
+        <rect class="n-mod" x="260" y="450" width="420" height="90" rx="8"/>
+        <text class="t-big" x="280" y="476">module.eks_addons</text>
+        <text class="t-code" x="660" y="476" text-anchor="end" style="fill:var(--muted)">modules/eks-addons</text>
+        <text class="t-sub" x="280" y="502">입력 ← tfvars: addons (vpc-cni · kube-proxy · coredns 버전 고정)</text>
+        <text class="t-sub" x="280" y="522">만드는 것: 관리형 애드온 3개 (pod-identity-agent는 버전 확인 후 추가)</text>
+
+        <!-- straight edges -->
+        <path class="edge flow acc" data-t="0.03,0.15" d="M470,120 V170"/>
+        <text class="t-edge acc" x="480" y="150">private_subnet_ids</text>
+        <path class="edge flow acc" data-t="0.36,0.48" d="M470,260 V310"/>
+        <text class="t-edge acc" x="480" y="290">cluster_name · cluster_version</text>
+        <path class="edge flow warm" data-t="0.80,0.94" data-c="warm" d="M470,400 V450"/>
+        <text class="t-edge warm" x="480" y="430">depends_on (노드 그룹 완료 후)</text>
+
+        <!-- side arcs -->
+        <path class="edge flow acc" data-t="0.16,0.34" d="M260,75 H200 V355 H260"/>
+        <text class="t-edge acc" x="192" y="210" text-anchor="end">private_subnet_ids</text>
+        <text class="t-sub" x="192" y="226" text-anchor="end">(노드를 둘 서브넷)</text>
+        <path class="edge flow acc" data-t="0.50,0.78" d="M680,215 H740 V495 H680"/>
+        <text class="t-edge acc" x="748" y="350">cluster_name</text>
+        <text class="t-sub" x="748" y="366">(애드온 설치 대상)</text>
+      </svg>
+    </div>
+    <figcaption>노드 그룹은 클러스터의 출력값 <code>cluster_version</code>을 받아서 씁니다. 애드온 버전과 노드 AMI(<code>release_version</code>)는 tfvars에 고정되어 있어서 자동으로 바뀌지 않습니다. 업그레이드할 때는 <code>kubernetes_version</code>과 함께 직접 올려야 합니다.</figcaption>
+  </figure>
+</section>
+
+<!-- 4. apply 순서 -->
+<section>
+  <h2><span class="step">4</span>apply 때 리소스가 만들어지는 순서</h2>
+  <p>서로 기다릴 게 없는 리소스는 동시에 만들어집니다(기본 병렬도 10). 아래 카드는 각 단계가 무엇을 기다렸다가 시작하는지 보여줍니다. 소요 시간은 대략적인 값입니다.</p>
+  <div class="controls">
+    <button type="button" id="playStages" aria-pressed="true">단계 재생 일시정지</button>
+  </div>
+  <div class="stages-scroll">
+    <div class="stages" id="stages">
+      <div class="stage" data-i="0">
+        <div class="hd"><span class="no">1단계</span><span class="time">~2분</span></div>
+        <h4>의존 없는 리소스 병렬 시작</h4>
+        <ul>
+          <li><b>modules/vpc</b>VPC → IGW · 서브넷 4 → EIP → NAT → 라우트 테이블</li>
+          <li><b>modules/eks-cluster</b>클러스터 IAM 역할 · KMS 키 · 로그 그룹</li>
+          <li><b>modules/eks-node-group</b>노드 IAM 역할 + 정책 4 · Launch Template</li>
+        </ul>
+        <div class="wait">기다리는 것: 없음</div>
+      </div>
+      <div class="link" data-i="0"><svg viewBox="0 0 44 20" aria-hidden="true"><path class="edge flow" d="M4,10 H40"/></svg></div>
+      <div class="stage" data-i="1">
+        <div class="hd"><span class="no">2단계</span><span class="time">~10분</span></div>
+        <h4>EKS 클러스터 생성</h4>
+        <ul>
+          <li><b>aws_eks_cluster</b>컨트롤 플레인 생성. vpc-cni · kube-proxy · coredns가 self-managed로 기본 설치됨</li>
+        </ul>
+        <div class="wait">기다리는 것: private 서브넷 · 클러스터 IAM 정책 · KMS 정책 · 로그 그룹</div>
+      </div>
+      <div class="link" data-i="1"><svg viewBox="0 0 44 20" aria-hidden="true"><path class="edge flow" d="M4,10 H40"/></svg></div>
+      <div class="stage" data-i="2">
+        <div class="hd"><span class="no">3단계</span><span class="time">~3–5분</span></div>
+        <h4>클러스터 후속 리소스</h4>
+        <ul>
+          <li><b>OIDC provider</b>tls_certificate로 인증서 지문 조회 후 생성</li>
+          <li><b>Access Entry</b>admin_principal_arns가 있을 때만</li>
+          <li><b>aws_eks_node_group</b>EC2 2대 부팅 → NAT로 이미지 pull → 클러스터 join</li>
+        </ul>
+        <div class="wait">기다리는 것: 클러스터 · 노드 IAM · Launch Template</div>
+      </div>
+      <div class="link" data-i="2"><svg viewBox="0 0 44 20" aria-hidden="true"><path class="edge flow" d="M4,10 H40"/></svg></div>
+      <div class="stage" data-i="3">
+        <div class="hd"><span class="no">4단계</span><span class="time">~1–2분</span></div>
+        <h4>관리형 애드온</h4>
+        <ul>
+          <li><b>terraform.tfvars</b>addons에 고정된 버전 사용 (자동 업데이트 없음)</li>
+          <li><b>aws_eks_addon × 4</b>기존 self-managed 애드온을 OVERWRITE로 관리형으로 전환</li>
+        </ul>
+        <div class="wait">기다리는 것: 노드 그룹 (depends_on)</div>
+      </div>
+      <div class="link" data-i="3"><svg viewBox="0 0 44 20" aria-hidden="true"><path class="edge flow" d="M4,10 H40"/></svg></div>
+      <div class="stage" data-i="4">
+        <div class="hd"><span class="no">5단계</span><span class="time">수 초</span></div>
+        <h4>마무리</h4>
+        <ul>
+          <li><b>state</b>S3에 terraform.tfstate 저장</li>
+          <li><b>unlock</b>.tflock 파일 삭제</li>
+          <li><b>outputs.tf</b>cluster_endpoint · configure_kubectl 등 출력</li>
+        </ul>
+        <div class="wait">기다리는 것: 모든 리소스</div>
+      </div>
+    </div>
+  </div>
+  <div class="note">NAT Gateway와 private 라우트 테이블은 노드 그룹과 코드상 직접 연결되어 있지 않습니다. 노드는 NAT를 통해서만 이미지를 받을 수 있는데, 지금은 클러스터 생성(약 10분) 동안 NAT가 먼저 끝나서 문제가 없을 뿐입니다. 순서를 확실히 보장하려면 노드 그룹 모듈에 VPC 모듈에 대한 <code>depends_on</code>을 추가하는 방법이 있습니다. <code>destroy</code>는 이 순서를 정확히 거꾸로 진행합니다.</div>
+</section>
+
+<!-- 5. 파일별 정리 -->
+<section>
+  <h2><span class="step">5</span>파일별 역할과 참조</h2>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>파일</th><th>역할</th><th>읽는 것 (참조)</th><th>읽어 가는 곳</th></tr></thead>
+      <tbody>
+        <tr class="grp"><td colspan="4">bootstrap/ — 로컬 state, 최초 1회</td></tr>
+        <tr><td>versions.tf</td><td>Terraform · aws provider 버전 고정, backend 없음</td><td>—</td><td>terraform init</td></tr>
+        <tr><td>providers.tf</td><td>리전, default_tags</td><td>var.region · var.project</td><td>버킷 관련 리소스 전체</td></tr>
+        <tr><td>variables.tf</td><td>region · project · 보존 기간 선언</td><td>terraform.tfvars</td><td>providers.tf · main.tf</td></tr>
+        <tr><td>terraform.tfvars</td><td>region = ap-northeast-2, project = macle</td><td>—</td><td>variables.tf (자동 로드)</td></tr>
+        <tr><td>main.tf</td><td>계정 ID 조회 → 버킷 이름 생성, 버전 관리 · 암호화 · 퍼블릭 차단 · TLS 정책</td><td>var.* · data.aws_caller_identity</td><td>outputs.tf</td></tr>
+        <tr><td>outputs.tf</td><td>state_bucket_name 출력</td><td>aws_s3_bucket.tfstate</td><td>사람 → envs/dev/backend.tf에 기입</td></tr>
+
+        <tr class="grp"><td colspan="4">envs/dev/ — 루트 모듈</td></tr>
+        <tr><td>versions.tf</td><td>Terraform ≥1.10, aws ~&gt; 6.0, tls ~&gt; 4.0</td><td>—</td><td>terraform init (.terraform.lock.hcl 생성)</td></tr>
+        <tr><td>backend.tf</td><td>S3 state 위치, use_lockfile</td><td>— (변수 사용 불가, 값 직접 기입)</td><td>terraform init</td></tr>
+        <tr><td>providers.tf</td><td>aws provider, default_tags</td><td>var.region · project · environment</td><td>모든 모듈의 aws 리소스 (상속)</td></tr>
+        <tr><td>variables.tf</td><td>입력 변수 선언 · 검증</td><td>terraform.tfvars</td><td>providers.tf · locals.tf · main.tf · outputs.tf</td></tr>
+        <tr><td>terraform.tfvars</td><td>DEV 실제 값 (CIDR, 1.37, 노드 스펙, 허용 IP, 애드온·AMI 고정 버전, EXTENDED)</td><td>—</td><td>variables.tf (자동 로드)</td></tr>
+        <tr><td>locals.tf</td><td>name_prefix = macle-dev, cluster_name = macle-dev-eks</td><td>var.project · var.environment</td><td>main.tf</td></tr>
+        <tr><td>main.tf</td><td>모듈 4개 호출, 출력값을 다음 모듈 입력으로 연결</td><td>var.* · local.* · module.*.출력값</td><td>outputs.tf</td></tr>
+        <tr><td>outputs.tf</td><td>vpc_id, cluster_endpoint, configure_kubectl 등</td><td>module.* · var.region</td><td>terraform output</td></tr>
+
+        <tr class="grp"><td colspan="4">modules/ — 각 모듈: variables.tf (입력) → main.tf (리소스) → outputs.tf (출력)</td></tr>
+        <tr><td>vpc</td><td>VPC, 서브넷 4, IGW, NAT, 라우트, 기본 SG 차단, EKS 서브넷 태그</td><td>name · cluster_name · cidr · azs · subnet_cidrs · single_nat_gateway</td><td>vpc_id · public/private_subnet_ids · nat_public_ips</td></tr>
+        <tr><td>eks-cluster</td><td>클러스터 IAM, KMS, 로그 그룹, aws_eks_cluster, OIDC, Access Entry</td><td>cluster_name · kubernetes_version · subnet_ids · public_access_cidrs · admin_principal_arns</td><td>cluster_name · cluster_version · endpoint · CA · SG · oidc_provider_arn</td></tr>
+        <tr><td>eks-node-group</td><td>노드 IAM, Launch Template (IMDSv2, gp3 암호화), 관리형 노드 그룹</td><td>cluster_name · kubernetes_version · subnet_ids · node_groups</td><td>node_role_arn · node_groups</td></tr>
+        <tr><td>eks-addons</td><td>tfvars의 고정 버전으로 aws_eks_addon 생성</td><td>cluster_name · addons</td><td>addon_versions</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var SVGNS = 'http://www.w3.org/2000/svg';
+
+  // 화살표를 따라 움직이는 점: data-t="시작,끝" (전체 주기 대비 비율)
+  function addDots() {
+    document.querySelectorAll('svg.anim').forEach(function (svg) {
+      var cycle = svg.getAttribute('data-cycle') || '8';
+      svg.querySelectorAll('path[data-t]').forEach(function (p) {
+        var t = p.getAttribute('data-t').split(',').map(Number);
+        var t0 = Math.max(0.01, t[0]), t1 = Math.min(0.98, t[1]);
+        var c = document.createElementNS(SVGNS, 'circle');
+        c.setAttribute('r', '4.5');
+        c.setAttribute('class', 'dot' + (p.getAttribute('data-c') === 'warm' ? ' warm' : ''));
+        c.setAttribute('opacity', '0');
+        var m = document.createElementNS(SVGNS, 'animateMotion');
+        m.setAttribute('dur', cycle + 's');
+        m.setAttribute('repeatCount', 'indefinite');
+        m.setAttribute('path', p.getAttribute('d'));
+        m.setAttribute('calcMode', 'linear');
+        m.setAttribute('keyPoints', '0;0;1;1');
+        m.setAttribute('keyTimes', '0;' + t0 + ';' + t1 + ';1');
+        var o = document.createElementNS(SVGNS, 'animate');
+        o.setAttribute('attributeName', 'opacity');
+        o.setAttribute('dur', cycle + 's');
+        o.setAttribute('repeatCount', 'indefinite');
+        o.setAttribute('values', '0;0;1;1;0;0');
+        o.setAttribute('keyTimes', '0;' + (t0 - 0.005) + ';' + t0 + ';' + t1 + ';' + (t1 + 0.005) + ';1');
+        c.appendChild(m); c.appendChild(o);
+        p.parentNode.appendChild(c);
+      });
+    });
+  }
+  if (!reduce) addDots();
+
+  var motionBtn = document.getElementById('toggleMotion');
+  var paused = reduce;
+  function applyMotion() {
+    document.body.classList.toggle('paused', paused);
+    document.querySelectorAll('svg.anim').forEach(function (s) {
+      try { paused ? s.pauseAnimations() : s.unpauseAnimations(); } catch (e) {}
+    });
+    motionBtn.textContent = paused ? '애니메이션 재생' : '애니메이션 일시정지';
+    motionBtn.setAttribute('aria-pressed', String(paused));
+  }
+  motionBtn.addEventListener('click', function () { paused = !paused; applyMotion(); setStagePlaying(!paused); });
+  applyMotion();
+
+  // 파일 참조 맵
+  var info = {
+    tfvars: ['envs/dev/terraform.tfvars', 'DEV 환경의 실제 값', '없음', 'variables.tf (Terraform이 자동 로드)'],
+    variables: ['envs/dev/variables.tf', '입력 변수의 타입·설명·검증 선언', 'terraform.tfvars의 값', 'providers.tf · locals.tf · main.tf · outputs.tf'],
+    locals: ['envs/dev/locals.tf', '이름 계산: name_prefix, cluster_name', 'var.project · var.environment', 'main.tf (local.name_prefix, local.cluster_name)'],
+    providers: ['envs/dev/providers.tf', 'aws provider: 리전과 공통 태그', 'var.region · var.project · var.environment', '모든 aws 리소스 (모듈도 provider를 상속)'],
+    main: ['envs/dev/main.tf', '모듈 4개를 호출하고 출력값을 다음 모듈 입력으로 연결', 'var.* · local.* · module.vpc / eks_cluster 출력값', 'outputs.tf · modules/* (source 경로)'],
+    outputs: ['envs/dev/outputs.tf', 'apply 후 보여줄 값', 'module.*.출력값 · var.region', 'terraform output 명령'],
+    versions: ['envs/dev/versions.tf', 'Terraform 및 provider 버전 고정', '없음', 'terraform init → provider 다운로드, .terraform.lock.hcl 생성'],
+    backend: ['envs/dev/backend.tf', 'state를 저장할 S3 위치와 잠금 방식', '없음 (backend 블록은 변수를 쓸 수 없음)', 'terraform init → S3 연결'],
+    init: ['terraform init', 'CLI 단계: provider 설치, 모듈 경로 연결, backend 초기화', 'versions.tf · backend.tf · main.tf의 source', '.terraform/ 폴더 · .terraform.lock.hcl'],
+    'm-vpc': ['modules/vpc', 'VPC, 서브넷 4, IGW, NAT, 라우트 테이블', 'name · cluster_name · cidr · azs · subnet_cidrs · single_nat_gateway', 'main.tf ← vpc_id · private_subnet_ids · nat_public_ips'],
+    'm-cluster': ['modules/eks-cluster', '클러스터 IAM, KMS, 로그 그룹, EKS, OIDC, Access Entry', 'cluster_name · kubernetes_version · subnet_ids(← vpc) · public_access_cidrs · admin_principal_arns', 'main.tf ← cluster_name · cluster_version · endpoint · oidc_provider_arn'],
+    'm-node': ['modules/eks-node-group', '노드 IAM, Launch Template, 관리형 노드 그룹', 'cluster_name · kubernetes_version (← eks_cluster) · subnet_ids (← vpc) · node_groups', 'main.tf ← node_groups · node_role_arn'],
+    'm-addons': ['modules/eks-addons', 'tfvars의 고정 버전으로 관리형 애드온 생성', 'cluster_name (← eks_cluster) · addons (← tfvars)', 'main.tf ← addon_versions']
+  };
+  var map = document.getElementById('fileMap');
+  var detail = document.getElementById('detail');
+  var current = null;
+  function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+  function showDetail(id) {
+    if (!id) {
+      detail.innerHTML = '<h3>파일을 클릭해 보세요</h3><dl><dt>예시</dt><dd>main.tf를 누르면 main.tf가 읽는 변수·로컬과 main.tf가 호출하는 모듈이 강조됩니다.</dd></dl>';
+      return;
+    }
+    var d = info[id];
+    detail.innerHTML = '<h3>' + esc(d[0]) + '</h3>' +
+      '<dl><dt>역할</dt><dd>' + esc(d[1]) + '</dd></dl>' +
+      '<dl><dt>읽는 것</dt><dd>' + esc(d[2]) + '</dd></dl>' +
+      '<dl><dt>읽어 가는 곳</dt><dd>' + esc(d[3]) + '</dd></dl>';
+  }
+  function focusNode(id) {
+    current = (current === id) ? null : id;
+    map.classList.toggle('focus', !!current);
+    map.querySelectorAll('.hot').forEach(function (el) { el.classList.remove('hot'); });
+    if (current) {
+      map.querySelector('[data-node="' + current + '"]').classList.add('hot');
+      map.querySelectorAll('[data-a],[data-b]').forEach(function (el) {
+        var a = el.getAttribute('data-a'), b = el.getAttribute('data-b');
+        if (a === current || b === current) {
+          el.classList.add('hot');
+          var other = a === current ? b : a;
+          var n = map.querySelector('[data-node="' + other + '"]');
+          if (n) n.classList.add('hot');
+        }
+      });
+    }
+    showDetail(current);
+  }
+  map.querySelectorAll('.node').forEach(function (n) {
+    var id = n.getAttribute('data-node');
+    n.addEventListener('click', function () { focusNode(id); });
+    n.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); focusNode(id); }
+    });
+  });
+  showDetail(null);
+
+  // apply 단계 재생
+  var stages = document.querySelectorAll('#stages .stage');
+  var links = document.querySelectorAll('#stages .link');
+  var playBtn = document.getElementById('playStages');
+  var idx = 0, timer = null;
+  function paint() {
+    stages.forEach(function (s, i) { s.classList.toggle('active', i === idx); });
+    links.forEach(function (l, i) { l.classList.toggle('active', i === idx - 1); });
+  }
+  function setStagePlaying(on) {
+    clearInterval(timer); timer = null;
+    if (on) timer = setInterval(function () { idx = (idx + 1) % stages.length; paint(); }, 1900);
+    playBtn.textContent = on ? '단계 재생 일시정지' : '단계 재생';
+    playBtn.setAttribute('aria-pressed', String(on));
+  }
+  playBtn.addEventListener('click', function () { setStagePlaying(!timer); });
+  stages.forEach(function (s, i) {
+    s.addEventListener('click', function () { idx = i; paint(); });
+  });
+  paint();
+  setStagePlaying(!reduce);
+})();
+</script>
+
+</body>
+</html>
