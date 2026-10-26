@@ -1,4 +1,4 @@
-# macle 인프라
+# hbilling 인프라
 
 사내 웹 서비스용 AWS EKS 인프라 (ap-northeast-2).
 

@@ -1,5 +1,5 @@
 region      = "ap-northeast-2"
-project     = "macle"
+project     = "hbilling"
 environment = "dev"
 
 # 네트워크
@@ -39,9 +39,8 @@ node_groups = {
 # 애드온 버전 고정 (EKS 1.37 호환, AWS 문서 기준 2026-10-17 확인)
 # 확인: aws eks describe-addon-versions --kubernetes-version 1.37 --addon-name <이름>
 addons = {
-  "vpc-cni"    = { version = "v1.23.1-eksbuild.1" }
-  "kube-proxy" = { version = "v1.37.0-eksbuild.4" }
-  "coredns"    = { version = "v1.14.7-eksbuild.10" }
-  # TODO: 문서에 1.37용 버전 표가 없어 미확인. 위 명령으로 버전을 확인한 뒤 주석 해제
-  # "eks-pod-identity-agent" = { version = "vX.Y.Z-eksbuild.N" }
+  "vpc-cni"                = { version = "v1.23.1-eksbuild.1" }
+  "kube-proxy"             = { version = "v1.37.0-eksbuild.4" }
+  "coredns"                = { version = "v1.14.7-eksbuild.10" }
+  "eks-pod-identity-agent" = { version = "v1.4.1-eksbuild.3" }
 }

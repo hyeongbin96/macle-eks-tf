@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
-<body><title>macle 테라폼 실행 흐름</title>
+<body><title>hbilling 테라폼 실행 흐름</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -178,8 +178,8 @@ tbody tr:last-child td { border-bottom: 0; }
 <div class="wrap">
 
 <header>
-  <div class="eyebrow">C:\terraform · macle · DEV · ap-northeast-2</div>
-  <h1>macle 테라폼 실행 흐름</h1>
+  <div class="eyebrow">C:\terraform · hbilling · DEV · ap-northeast-2</div>
+  <h1>hbilling 테라폼 실행 흐름</h1>
   <p class="lede">작성한 Terraform 코드가 <code>terraform init</code>부터 <code>apply</code>까지 어떤 순서로 실행되는지 정리한 페이지입니다. 어떤 파일이 어떤 파일을 읽는지, 모듈 사이로 어떤 값이 넘어가는지도 함께 보여줍니다. 움직이는 점은 실제 실행·데이터 흐름의 순서를 나타냅니다.</p>
   <div class="controls">
     <button type="button" id="toggleMotion" aria-pressed="false">애니메이션 일시정지</button>
@@ -216,7 +216,7 @@ tbody tr:last-child td { border-bottom: 0; }
         <text class="t-sub" x="630" y="74" text-anchor="middle">버킷 생성 · 로컬에 state</text>
         <rect class="n-aws" x="790" y="30" width="190" height="60" rx="8"/>
         <text class="t-title" x="885" y="55" text-anchor="middle">S3 버킷</text>
-        <text class="t-sub" x="885" y="74" text-anchor="middle">macle-tfstate-&lt;계정ID&gt;</text>
+        <text class="t-sub" x="885" y="74" text-anchor="middle">hbilling-tfstate-&lt;계정ID&gt;</text>
 
         <path class="edge flow" data-t="0.02,0.08" d="M310,60 H350"/>
         <path class="edge flow" data-t="0.09,0.15" d="M510,60 H550"/>
@@ -253,7 +253,7 @@ tbody tr:last-child td { border-bottom: 0; }
 
         <!-- S3 state -->
         <rect class="n-aws" x="150" y="270" width="560" height="54" rx="8"/>
-        <text class="t-title" x="430" y="293" text-anchor="middle">s3://macle-tfstate-&lt;계정ID&gt;/envs/dev/terraform.tfstate</text>
+        <text class="t-title" x="430" y="293" text-anchor="middle">s3://hbilling-tfstate-&lt;계정ID&gt;/envs/dev/terraform.tfstate</text>
         <text class="t-sub" x="430" y="312" text-anchor="middle">use_lockfile = true → 실행 중에는 .tflock 파일로 동시 실행을 막음</text>
       </svg>
     </div>
@@ -320,7 +320,7 @@ tbody tr:last-child td { border-bottom: 0; }
         <g class="node" data-node="locals" tabindex="0" role="button" aria-label="locals.tf">
           <rect class="n-file" x="250" y="220" width="170" height="50" rx="7"/>
           <text class="t-title" x="335" y="241" text-anchor="middle">locals.tf</text>
-          <text class="t-sub" x="335" y="259" text-anchor="middle">macle-dev · macle-dev-eks</text>
+          <text class="t-sub" x="335" y="259" text-anchor="middle">hbilling-dev · hbilling-dev-eks</text>
         </g>
         <g class="node" data-node="providers" tabindex="0" role="button" aria-label="providers.tf">
           <rect class="n-file" x="520" y="40" width="180" height="50" rx="7"/>
@@ -520,7 +520,7 @@ tbody tr:last-child td { border-bottom: 0; }
         <tr><td>versions.tf</td><td>Terraform · aws provider 버전 고정, backend 없음</td><td>—</td><td>terraform init</td></tr>
         <tr><td>providers.tf</td><td>리전, default_tags</td><td>var.region · var.project</td><td>버킷 관련 리소스 전체</td></tr>
         <tr><td>variables.tf</td><td>region · project · 보존 기간 선언</td><td>terraform.tfvars</td><td>providers.tf · main.tf</td></tr>
-        <tr><td>terraform.tfvars</td><td>region = ap-northeast-2, project = macle</td><td>—</td><td>variables.tf (자동 로드)</td></tr>
+        <tr><td>terraform.tfvars</td><td>region = ap-northeast-2, project = hbilling</td><td>—</td><td>variables.tf (자동 로드)</td></tr>
         <tr><td>main.tf</td><td>계정 ID 조회 → 버킷 이름 생성, 버전 관리 · 암호화 · 퍼블릭 차단 · TLS 정책</td><td>var.* · data.aws_caller_identity</td><td>outputs.tf</td></tr>
         <tr><td>outputs.tf</td><td>state_bucket_name 출력</td><td>aws_s3_bucket.tfstate</td><td>사람 → envs/dev/backend.tf에 기입</td></tr>
 
@@ -530,7 +530,7 @@ tbody tr:last-child td { border-bottom: 0; }
         <tr><td>providers.tf</td><td>aws provider, default_tags</td><td>var.region · project · environment</td><td>모든 모듈의 aws 리소스 (상속)</td></tr>
         <tr><td>variables.tf</td><td>입력 변수 선언 · 검증</td><td>terraform.tfvars</td><td>providers.tf · locals.tf · main.tf · outputs.tf</td></tr>
         <tr><td>terraform.tfvars</td><td>DEV 실제 값 (CIDR, 1.37, 노드 스펙, 허용 IP, 애드온·AMI 고정 버전, EXTENDED)</td><td>—</td><td>variables.tf (자동 로드)</td></tr>
-        <tr><td>locals.tf</td><td>name_prefix = macle-dev, cluster_name = macle-dev-eks</td><td>var.project · var.environment</td><td>main.tf</td></tr>
+        <tr><td>locals.tf</td><td>name_prefix = hbilling-dev, cluster_name = hbilling-dev-eks</td><td>var.project · var.environment</td><td>main.tf</td></tr>
         <tr><td>main.tf</td><td>모듈 4개 호출, 출력값을 다음 모듈 입력으로 연결</td><td>var.* · local.* · module.*.출력값</td><td>outputs.tf</td></tr>
         <tr><td>outputs.tf</td><td>vpc_id, cluster_endpoint, configure_kubectl 등</td><td>module.* · var.region</td><td>terraform output</td></tr>
 

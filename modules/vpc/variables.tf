@@ -1,6 +1,6 @@
 variable "name" {
   type        = string
-  description = "리소스 이름 접두사 (예: macle-dev)"
+  description = "리소스 이름 접두사 (예: hbilling-dev)"
 }
 
 variable "cluster_name" {
