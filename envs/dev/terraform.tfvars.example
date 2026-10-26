@@ -27,8 +27,8 @@ cluster_log_retention_days = 30
 node_groups = {
   default = {
     instance_types = ["t3.medium"]
-    # AL2023 AMI 고정 (https://github.com/awslabs/amazon-eks-ami/releases)
-    release_version = "1.37.0-20261012"
+    # AL2023 AMI 고정. 확인: aws ssm get-parameter --name /aws/service/eks/optimized-ami/1.37/amazon-linux-2023/x86_64/standard/recommended/release_version
+    release_version = "1.37.1-20261023"
     desired_size    = 2
     min_size        = 1
     max_size        = 3
